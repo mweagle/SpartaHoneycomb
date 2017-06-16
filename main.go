@@ -15,6 +15,7 @@ import (
 	gocf "github.com/crewjam/go-cloudformation"
 	"github.com/honeycombio/libhoney-go"
 	sparta "github.com/mweagle/Sparta"
+	spartaCF "github.com/mweagle/Sparta/aws/cloudformation"
 	spartaCGO "github.com/mweagle/Sparta/cgo"
 	spartaVault "github.com/mweagle/SpartaVault/encrypt"
 )
@@ -128,7 +129,8 @@ func main() {
 	lambdaFunctions = append(lambdaFunctions, lambdaFn)
 
 	// Use the CGO version of this function
-	err := spartaCGO.Main("SpartaHoneycomb",
+	stackName := spartaCF.UserScopedStackName("SpartaHoneycomb")
+	err := spartaCGO.Main(stackName,
 		fmt.Sprintf("Test sending events to Honeycomb.io"),
 		lambdaFunctions,
 		nil,
