@@ -19,7 +19,6 @@ var mockEventJSON = `{
 func mockContext() *sparta.LambdaContext {
 	return &sparta.LambdaContext{
 		AWSRequestID:       "75b4d36b-426e-11e7-a8e8-29a80f7c49a8",
-		InvokeID:           "",
 		LogGroupName:       "/aws/lambda/SpartaHoneycombTest-mweagleSpartaHoneycombTest-1IYQNUEKTGEGV",
 		LogStreamName:      "2017/05/26/[$LATEST]cfdcafcb1a4244bdbf3ffd16cb199654",
 		FunctionName:       "SpartaHoneycombTest-mweagleSpartaHoneycombTest-1IYQNUEKTGEGV",
