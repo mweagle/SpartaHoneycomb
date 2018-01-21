@@ -1,23 +1,22 @@
 package main
 
 import (
-	"encoding/json"
+	"context"
 	"fmt"
 	"io/ioutil"
 	"math/rand"
-	"net/http"
 	"os"
 	"runtime"
 
 	"sync"
 
-	"github.com/Sirupsen/logrus"
 	gocf "github.com/crewjam/go-cloudformation"
 	"github.com/honeycombio/libhoney-go"
 	sparta "github.com/mweagle/Sparta"
+	spartaAWS "github.com/mweagle/Sparta/aws"
 	spartaCF "github.com/mweagle/Sparta/aws/cloudformation"
-	spartaCGO "github.com/mweagle/Sparta/cgo"
 	spartaVault "github.com/mweagle/SpartaVault/encrypt"
+	"github.com/sirupsen/logrus"
 )
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -77,14 +76,12 @@ func newHoneycombHook(writeKey string, datasetName string) logrus.Hook {
 }
 
 // Honeycomb.io function
-func helloHoneycomb(event *json.RawMessage,
-	context *sparta.LambdaContext,
-	w http.ResponseWriter,
-	logger *logrus.Logger) {
+func helloHoneycomb(ctx context.Context) (string, error) {
+	logger, _ := ctx.Value(sparta.ContextKeyLogger).(*logrus.Logger)
 
 	// Lazily register the logrus logging hook
 	oneTime.Do(func() {
-		key, keyErr := HoneycombWriteKey.Decrypt(spartaCGO.NewSession())
+		key, keyErr := HoneycombWriteKey.Decrypt(spartaAWS.NewSession(logger))
 		if nil != keyErr {
 			logger.Error("Failed to decrypt WriteKey: " + keyErr.Error())
 		} else {
@@ -98,8 +95,7 @@ func helloHoneycomb(event *json.RawMessage,
 	logger.WithFields(logrus.Fields{
 		"bee_stings": rand.Int31n(10),
 	}).Info("'tis only a flesh wound")
-
-	w.Write([]byte("Hello 🐝"))
+	return "Hello 🐝", nil
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -118,19 +114,21 @@ func main() {
 	iamLambdaRole.Privileges = append(iamLambdaRole.Privileges, sparta.IAMRolePrivilege{
 		Actions:  []string{"kms:Decrypt"},
 		Resource: kmsARN})
-	lambdaFn := sparta.NewLambda(iamLambdaRole,
+	lambdaFn := sparta.HandleAWSLambda("helloHoneycomb",
 		helloHoneycomb,
-		&sparta.LambdaFunctionOptions{
-			Description: "Sample Honeycomb.io function",
-			Timeout:     10,
-		})
+		sparta.IAMRoleDefinition{})
+	lambdaFn.Options = &sparta.LambdaFunctionOptions{
+		Description: "Sample Honeycomb.io function",
+		Timeout:     10,
+		MemorySize:  128,
+	}
 
 	var lambdaFunctions []*sparta.LambdaAWSInfo
 	lambdaFunctions = append(lambdaFunctions, lambdaFn)
 
 	// Use the CGO version of this function
 	stackName := spartaCF.UserScopedStackName("SpartaHoneycomb")
-	err := spartaCGO.Main(stackName,
+	err := sparta.Main(stackName,
 		fmt.Sprintf("Test sending events to Honeycomb.io"),
 		lambdaFunctions,
 		nil,
